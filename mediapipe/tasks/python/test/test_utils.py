@@ -49,8 +49,8 @@ def get_test_data_path(file_or_dirname_path: str) -> str:
       path = os.path.join(directory, f)
       if path.endswith(file_or_dirname_path):
         return path
-  raise ValueError("No %s in test directory: %s." %
-                   (file_or_dirname_path, test_srcdir()))
+  raise ValueError(
+      f"No {file_or_dirname_path} in test directory: {test_srcdir()}.")
 
 
 def create_calibration_file(file_dir: str,
@@ -96,8 +96,7 @@ def assert_proto_equals(self,
 
   for pb in a, b:
     if check_initialized:
-      errors = pb.FindInitializationErrors()
-      if errors:
+      if errors := pb.FindInitializationErrors():
         self.fail("Initialization errors: %s\n%s" % (errors, pb))
     if normalize_numbers:
       _normalize_number_fields(pb)
@@ -111,11 +110,9 @@ def assert_proto_equals(self,
   # For context, see: https://bugs.python.org/issue11763.
   if len(a_str) < 2**16 and len(b_str) < 2**16:
     self.assertMultiLineEqual(a_str, b_str, msg=msg)
-  else:
-    diff = "".join(
-        difflib.unified_diff(a_str.splitlines(True), b_str.splitlines(True)))
-    if diff:
-      self.fail("%s :\n%s" % (msg, diff))
+  elif diff := "".join(
+        difflib.unified_diff(a_str.splitlines(True), b_str.splitlines(True))):
+    self.fail("%s :\n%s" % (msg, diff))
 
 
 def _normalize_number_fields(pb):
@@ -168,8 +165,10 @@ def _normalize_number_fields(pb):
       else:
         setattr(pb, desc.name, normalized_values[0])
 
-    if (desc.type == descriptor.FieldDescriptor.TYPE_MESSAGE or
-        desc.type == descriptor.FieldDescriptor.TYPE_GROUP):
+    if desc.type in [
+        descriptor.FieldDescriptor.TYPE_MESSAGE,
+        descriptor.FieldDescriptor.TYPE_GROUP,
+    ]:
       if (desc.type == descriptor.FieldDescriptor.TYPE_MESSAGE and
           desc.message_type.has_options and
           desc.message_type.GetOptions().map_entry):

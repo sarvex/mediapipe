@@ -43,7 +43,7 @@ def _normalize_path(path):
 
 
 def _get_backup_file(path):
-  return path + '.backup'
+  return f'{path}.backup'
 
 
 def _parse_requirements(path):
@@ -109,9 +109,8 @@ def _modify_opencv_cmake_rule(link_opencv):
                    'r').read().replace('OPENCV_SHARED_LIBS = True',
                                        'OPENCV_SHARED_LIBS = False')
     shutil.move(MP_THIRD_PARTY_BUILD, _get_backup_file(MP_THIRD_PARTY_BUILD))
-    build_file = open(MP_THIRD_PARTY_BUILD, 'w')
-    build_file.write(content)
-    build_file.close()
+    with open(MP_THIRD_PARTY_BUILD, 'w') as build_file:
+      build_file.write(content)
 
 
 def _add_mp_init_files():
@@ -119,20 +118,27 @@ def _add_mp_init_files():
   open(MP_ROOT_INIT_PY, 'w').close()
   # Save the original mediapipe/__init__.py file.
   shutil.copyfile(MP_DIR_INIT_PY, _get_backup_file(MP_DIR_INIT_PY))
-  mp_dir_init_file = open(MP_DIR_INIT_PY, 'a')
-  mp_dir_init_file.writelines([
-      '\n', 'from mediapipe.python import *\n',
-      'import mediapipe.python.solutions as solutions \n',
-      'import mediapipe.tasks.python as tasks\n', '\n\n', 'del framework\n',
-      'del gpu\n', 'del modules\n', 'del python\n', 'del mediapipe\n',
-      'del util\n', '__version__ = \'{}\''.format(__version__), '\n'
-  ])
-  mp_dir_init_file.close()
+  with open(MP_DIR_INIT_PY, 'a') as mp_dir_init_file:
+    mp_dir_init_file.writelines([
+        '\n',
+        'from mediapipe.python import *\n',
+        'import mediapipe.python.solutions as solutions \n',
+        'import mediapipe.tasks.python as tasks\n',
+        '\n\n',
+        'del framework\n',
+        'del gpu\n',
+        'del modules\n',
+        'del python\n',
+        'del mediapipe\n',
+        'del util\n',
+        f"__version__ = \'{__version__}\'",
+        '\n',
+    ])
 
 
 def _copy_to_build_lib_dir(build_lib, file):
   """Copy a file from bazel-bin to the build lib dir."""
-  dst = os.path.join(build_lib + '/', file)
+  dst = os.path.join(f'{build_lib}/', file)
   dst_dir = os.path.dirname(dst)
   if not os.path.exists(dst_dir):
     os.makedirs(dst_dir)
@@ -200,8 +206,10 @@ class GeneratePyProtos(build_ext.build_ext):
     if not os.path.exists(output):
       sys.stderr.write('generating proto file: %s\n' % output)
       protoc_command = [
-          self._protoc, '-I.',
-          '--python_out=' + os.path.abspath(self.build_lib), source
+          self._protoc,
+          '-I.',
+          f'--python_out={os.path.abspath(self.build_lib)}',
+          source,
       ]
       if subprocess.call(protoc_command) != 0:
         sys.exit(-1)
@@ -280,37 +288,35 @@ class BuildModules(build_ext.build_ext):
         '--compilation_mode=opt',
         '--copt=-DNDEBUG',
         '--define=MEDIAPIPE_DISABLE_GPU=1',
-        '--action_env=PYTHON_BIN_PATH=' + _normalize_path(sys.executable),
+        f'--action_env=PYTHON_BIN_PATH={_normalize_path(sys.executable)}',
         binary_graph_target,
     ]
     if not self.link_opencv and not IS_WINDOWS:
       bazel_command.append('--define=OPENCV=source')
     if subprocess.call(bazel_command) != 0:
       sys.exit(-1)
-    _copy_to_build_lib_dir(self.build_lib, binary_graph_target + '.binarypb')
+    _copy_to_build_lib_dir(self.build_lib, f'{binary_graph_target}.binarypb')
 
 
 class GenerateMetadataSchema(build_ext.build_ext):
   """Generate metadata python schema files."""
 
   def run(self):
+    schema_file = 'mediapipe/tasks/metadata/metadata_schema.fbs'
     for target in ['metadata_schema_py', 'schema_py']:
       bazel_command = [
           'bazel',
           'build',
           '--compilation_mode=opt',
           '--define=MEDIAPIPE_DISABLE_GPU=1',
-          '--action_env=PYTHON_BIN_PATH=' + _normalize_path(sys.executable),
-          '//mediapipe/tasks/metadata:' + target,
+          f'--action_env=PYTHON_BIN_PATH={_normalize_path(sys.executable)}',
+          f'//mediapipe/tasks/metadata:{target}',
       ]
       if subprocess.call(bazel_command) != 0:
         sys.exit(-1)
-      _copy_to_build_lib_dir(
-          self.build_lib,
-          'mediapipe/tasks/metadata/' + target + '_generated.py')
-      schema_file = 'mediapipe/tasks/metadata/metadata_schema.fbs'
-      shutil.copyfile(schema_file,
-                      os.path.join(self.build_lib + '/', schema_file))
+      _copy_to_build_lib_dir(self.build_lib,
+                             f'mediapipe/tasks/metadata/{target}_generated.py')
+      shutil.copyfile(schema_file, os.path.join(f'{self.build_lib}/', schema_file))
 
 
 class BazelExtension(setuptools.Extension):
@@ -344,14 +350,14 @@ class BuildExtension(build_ext.build_ext):
 
   def run(self):
     _check_bazel()
-    if IS_MAC:
-      for ext in self.extensions:
+    for ext in self.extensions:
+      if IS_MAC:
         target_name = self.get_ext_fullpath(ext.name)
         # Build x86
         self._build_binary(ext)
         x86_name = self.get_ext_fullpath(ext.name)
         # Build Arm64
-        ext.name = ext.name + '.arm64'
+        ext.name = f'{ext.name}.arm64'
         self._build_binary(
             ext,
             ['--cpu=darwin_arm64', '--ios_multi_cpus=i386,x86_64,armv7,arm64'],
@@ -368,8 +374,7 @@ class BuildExtension(build_ext.build_ext):
         ]
         if subprocess.call(lipo_command) != 0:
           sys.exit(-1)
-    else:
-      for ext in self.extensions:
+      else:
         self._build_binary(ext)
     build_ext.build_ext.run(self)
 
@@ -382,8 +387,8 @@ class BuildExtension(build_ext.build_ext):
         '--compilation_mode=opt',
         '--copt=-DNDEBUG',
         '--define=MEDIAPIPE_DISABLE_GPU=1',
-        '--action_env=PYTHON_BIN_PATH=' + _normalize_path(sys.executable),
-        str(ext.bazel_target + '.so'),
+        f'--action_env=PYTHON_BIN_PATH={_normalize_path(sys.executable)}',
+        str(f'{ext.bazel_target}.so'),
     ]
     if extra_args:
       bazel_command += extra_args
@@ -392,7 +397,7 @@ class BuildExtension(build_ext.build_ext):
     if subprocess.call(bazel_command) != 0:
       sys.exit(-1)
     ext_bazel_bin_path = os.path.join('bazel-bin', ext.relpath,
-                                      ext.target_name + '.so')
+                                      f'{ext.target_name}.so')
     ext_dest_path = self.get_ext_fullpath(ext.name)
     ext_dest_dir = os.path.dirname(ext_dest_path)
     if not os.path.exists(ext_dest_dir):

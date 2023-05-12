@@ -156,7 +156,7 @@ class Dataset(classification_dataset.ClassificationDataset):
       ObjectDetectorDataset object.
     """
     # Get TFRecord Files
-    tfrecord_file_pattern = cache_prefix + '*.tfrecord'
+    tfrecord_file_pattern = f'{cache_prefix}*.tfrecord'
     matched_files = tf.io.gfile.glob(tfrecord_file_pattern)
     if not matched_files:
       raise ValueError('TFRecord files are empty.')
@@ -164,7 +164,7 @@ class Dataset(classification_dataset.ClassificationDataset):
     # Load meta_data.
     meta_data_file = cache_prefix + dataset_util.META_DATA_FILE_SUFFIX
     if not tf.io.gfile.exists(meta_data_file):
-      raise ValueError("Metadata file %s doesn't exist." % meta_data_file)
+      raise ValueError(f"Metadata file {meta_data_file} doesn't exist.")
     with tf.io.gfile.GFile(meta_data_file, 'r') as f:
       meta_data = yaml.load(f, Loader=yaml.FullLoader)
 

@@ -95,20 +95,19 @@ class Dataset(object):
       preprocess = functools.partial(preprocess, is_training=is_training)
       dataset = dataset.map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
 
-    if is_training:
-      if shuffle:
-        # Shuffle size should be bigger than the batch_size. Otherwise it's only
-        # shuffling within the batch, which equals to not having shuffle.
-        buffer_size = 3 * batch_size
-        # But since we are doing shuffle before repeat, it doesn't make sense to
-        # shuffle more than total available entries.
-        # TODO: Investigate if shuffling before / after repeat
-        # dataset can get a better performance?
-        # Shuffle after repeat will give a more randomized dataset and mix the
-        # epoch boundary: https://www.tensorflow.org/guide/data
-        if self._size:
-          buffer_size = min(self._size, buffer_size)
-        dataset = dataset.shuffle(buffer_size=buffer_size)
+    if is_training and shuffle:
+      # Shuffle size should be bigger than the batch_size. Otherwise it's only
+      # shuffling within the batch, which equals to not having shuffle.
+      buffer_size = 3 * batch_size
+      # But since we are doing shuffle before repeat, it doesn't make sense to
+      # shuffle more than total available entries.
+      # TODO: Investigate if shuffling before / after repeat
+      # dataset can get a better performance?
+      # Shuffle after repeat will give a more randomized dataset and mix the
+      # epoch boundary: https://www.tensorflow.org/guide/data
+      if self._size:
+        buffer_size = min(self._size, buffer_size)
+      dataset = dataset.shuffle(buffer_size=buffer_size)
 
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
@@ -118,10 +117,7 @@ class Dataset(object):
 
   def __len__(self):
     """Returns the number of element of the dataset."""
-    if self._size is not None:
-      return self._size
-    else:
-      return len(self._dataset)
+    return self._size if self._size is not None else len(self._dataset)
 
   def split(self: _DatasetT, fraction: float) -> Tuple[_DatasetT, _DatasetT]:
     """Splits dataset into two sub-datasets with the given fraction.

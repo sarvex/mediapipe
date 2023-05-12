@@ -27,8 +27,7 @@ class FaceStylizerTest(tf.test.TestCase):
     """Loads training dataset."""
     input_data_dir = test_utils.get_test_data_path('testdata')
 
-    data = face_stylizer.Dataset.from_folder(dirname=input_data_dir)
-    return data
+    return face_stylizer.Dataset.from_folder(dirname=input_data_dir)
 
   def _evaluate_saved_model(self, model: face_stylizer.FaceStylizer):
     """Evaluates the fine-tuned face stylizer model."""

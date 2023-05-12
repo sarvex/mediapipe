@@ -105,11 +105,10 @@ def get_steps_per_epoch(steps_per_epoch: Optional[int] = None,
   if steps_per_epoch is not None:
     # steps_per_epoch is set by users manually.
     return steps_per_epoch
-  else:
-    if train_data is None:
-      raise ValueError('Input train_data cannot be None.')
-    # Gets the steps by the length of the training data.
-    return len(train_data) // batch_size
+  if train_data is None:
+    raise ValueError('Input train_data cannot be None.')
+  # Gets the steps by the length of the training data.
+  return len(train_data) // batch_size
 
 
 def convert_to_tflite(
@@ -143,8 +142,7 @@ def convert_to_tflite(
           converter, preprocess=preprocess)
 
     converter.target_spec.supported_ops = supported_ops
-    tflite_model = converter.convert()
-    return tflite_model
+    return converter.convert()
 
 
 def save_tflite(tflite_model: bytearray, tflite_file: str) -> None:
@@ -159,7 +157,7 @@ def save_tflite(tflite_model: bytearray, tflite_file: str) -> None:
   with tf.io.gfile.GFile(tflite_file, 'wb') as f:
     f.write(tflite_model)
   tf.compat.v1.logging.info(
-      'TensorFlow Lite model exported successfully to: %s' % tflite_file)
+      f'TensorFlow Lite model exported successfully to: {tflite_file}')
 
 
 class WarmUp(tf.keras.optimizers.schedules.LearningRateSchedule):
@@ -278,28 +276,24 @@ class LiteRunner(object):
         output_tensor = (output_tensor - zero_point) * scale
       output_tensors.append(output_tensor)
 
-    if len(output_tensors) == 1:
-      return output_tensors[0]
-    return output_tensors
+    return output_tensors[0] if len(output_tensors) == 1 else output_tensors
 
 
 def get_lite_runner(tflite_buffer: bytearray) -> 'LiteRunner':
   """Returns a `LiteRunner` from flatbuffer of the TFLite model."""
-  lite_runner = LiteRunner(tflite_buffer)
-  return lite_runner
+  return LiteRunner(tflite_buffer)
 
 
 def _get_input_tensor(input_tensors: Union[List[tf.Tensor], Dict[str,
                                                                  tf.Tensor]],
                       input_details: Dict[str, Any], index: int) -> tf.Tensor:
   """Returns input tensor in `input_tensors` that maps `input_detail[i]`."""
-  if isinstance(input_tensors, dict):
-    # Gets the mapped input tensor.
-    input_detail = input_details
-    for input_tensor_name, input_tensor in input_tensors.items():
-      if input_tensor_name in input_detail['name']:
-        return input_tensor
-    raise ValueError('Input tensors don\'t contains a tensor that mapped the '
-                     'input detail %s' % str(input_detail))
-  else:
+  if not isinstance(input_tensors, dict):
     return input_tensors[index]
+  # Gets the mapped input tensor.
+  input_detail = input_details
+  for input_tensor_name, input_tensor in input_tensors.items():
+    if input_tensor_name in input_detail['name']:
+      return input_tensor
+  raise ValueError('Input tensors don\'t contains a tensor that mapped the '
+                   'input detail %s' % str(input_detail))
